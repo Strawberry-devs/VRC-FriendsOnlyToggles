@@ -2,6 +2,8 @@
 
 Turn MA/VRCFury/regular avatar controls into friends-only space. Toggles stay inactive for strangers, while float/radial/axis controls stay at their configured default. Any changes remain visible to you and friends.
 
+![Friends-Only Toggles example](docs/friendsonlytoggles.png)
+
 ## Use
 
 1. Double click `FriendsOnlyToggles.unitypackage`, or add the VPM repository to VCC and install **VRC Friends-Only Toggles**.
