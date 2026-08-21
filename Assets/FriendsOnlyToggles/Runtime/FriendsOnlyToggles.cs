@@ -18,6 +18,8 @@ namespace Strawberry.FriendsOnlyToggles
             public string parameter;
             public string controlType;
             public float activeValue = 1f;
+            public float defaultValue;
+            public bool continuous;
             public bool supported = true;
             public bool friendsOnly;
         }

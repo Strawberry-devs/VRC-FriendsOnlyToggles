@@ -106,6 +106,18 @@ namespace Strawberry.FriendsOnlyToggles.Editor
             var parameter = controller.parameters.FirstOrDefault(p => p.name == rule.parameter);
             if (parameter == null) return 0;
 
+            if (rule.continuous)
+            {
+                if (parameter.type != AnimatorControllerParameterType.Float)
+                {
+                    Debug.LogWarning("Friends-Only Toggles: continuous control '" + rule.menuPath +
+                                     "' does not use a Float animator parameter and was skipped.");
+                    return 0;
+                }
+                return ProtectContinuousRule(controller, rule, friendsParameterType, localParameterType,
+                    generatedParameterIndex);
+            }
+
             var inactiveValue = Mathf.Approximately(rule.activeValue, 0f) ? 1f : 0f;
             var changes = 0;
             foreach (var layer in controller.layers)
@@ -122,6 +134,178 @@ namespace Strawberry.FriendsOnlyToggles.Editor
                 changes += directBlendChanges;
             }
             return changes;
+        }
+
+        private static int ProtectContinuousRule(AnimatorController controller,
+            FriendsOnlyToggles.ToggleRule rule, AnimatorControllerParameterType friendsParameterType,
+            AnimatorControllerParameterType localParameterType, int generatedParameterIndex)
+        {
+            var defaultParameter = "__FOT/default/" + generatedParameterIndex + "/" + rule.parameter;
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = defaultParameter,
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = rule.defaultValue
+            });
+
+            var changes = 0;
+            foreach (var layer in controller.layers)
+            {
+                changes += GateContinuousMotions(controller, layer.stateMachine, rule.parameter,
+                    defaultParameter, generatedParameterIndex);
+                changes += ProcessContinuousStateMachine(layer.stateMachine, rule.parameter, rule.defaultValue,
+                    friendsParameterType, localParameterType);
+            }
+
+            return changes;
+        }
+
+        private static int GateContinuousMotions(AnimatorController controller, AnimatorStateMachine machine,
+            string sourceParameter, string defaultParameter, int generatedParameterIndex)
+        {
+            var changes = 0;
+            foreach (var childState in machine.states)
+            {
+                var state = childState.state;
+                if (!MotionUsesParameter(state.motion, sourceParameter, new HashSet<int>())) continue;
+                var defaultMotion = CloneWithParameter(controller, state.motion, sourceParameter,
+                    defaultParameter, generatedParameterIndex);
+                state.motion = CreateViewerGate(controller, state.motion, defaultMotion,
+                    generatedParameterIndex, state.name);
+                EditorUtility.SetDirty(state);
+                changes++;
+            }
+
+            foreach (var childMachine in machine.stateMachines)
+                changes += GateContinuousMotions(controller, childMachine.stateMachine, sourceParameter,
+                    defaultParameter, generatedParameterIndex);
+            return changes;
+        }
+
+        private static bool MotionUsesParameter(Motion motion, string parameter, HashSet<int> visited)
+        {
+            var tree = motion as BlendTree;
+            if (tree == null || !visited.Add(tree.GetInstanceID())) return false;
+            if (tree.blendParameter == parameter || tree.blendParameterY == parameter) return true;
+
+            foreach (var child in tree.children)
+            {
+                if (child.directBlendParameter == parameter ||
+                    MotionUsesParameter(child.motion, parameter, visited)) return true;
+            }
+            return false;
+        }
+
+        private static Motion CloneWithParameter(AnimatorController controller, Motion motion, string source,
+            string replacement, int generatedParameterIndex)
+        {
+            var tree = motion as BlendTree;
+            if (tree == null || !MotionUsesParameter(tree, source, new HashSet<int>())) return motion;
+
+            var clone = UnityEngine.Object.Instantiate(tree);
+            clone.name = "FOT Default " + generatedParameterIndex + " - " + tree.name;
+            clone.hideFlags = HideFlags.HideInHierarchy;
+            AssetDatabase.AddObjectToAsset(clone, controller);
+            if (clone.blendParameter == source) clone.blendParameter = replacement;
+            if (clone.blendParameterY == source) clone.blendParameterY = replacement;
+
+            var children = clone.children;
+            for (var i = 0; i < children.Length; i++)
+            {
+                var child = children[i];
+                if (child.directBlendParameter == source) child.directBlendParameter = replacement;
+                child.motion = CloneWithParameter(controller, child.motion, source, replacement,
+                    generatedParameterIndex);
+                children[i] = child;
+            }
+            clone.children = children;
+            EditorUtility.SetDirty(clone);
+            return clone;
+        }
+
+        private static Motion CreateViewerGate(AnimatorController controller, Motion liveMotion,
+            Motion defaultMotion, int generatedParameterIndex, string stateName)
+        {
+            var friendGate = CreateBlendTree(controller,
+                "FOT Friend Gate " + generatedParameterIndex + " - " + stateName, FriendsParameter);
+            friendGate.AddChild(defaultMotion, 0f);
+            friendGate.AddChild(liveMotion, 1f);
+
+            var localGate = CreateBlendTree(controller,
+                "FOT Local Gate " + generatedParameterIndex + " - " + stateName, LocalParameter);
+            localGate.AddChild(friendGate, 0f);
+            localGate.AddChild(liveMotion, 1f);
+            return localGate;
+        }
+
+        private static BlendTree CreateBlendTree(AnimatorController controller, string name, string parameter)
+        {
+            var tree = new BlendTree
+            {
+                name = name,
+                hideFlags = HideFlags.HideInHierarchy,
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = parameter,
+                useAutomaticThresholds = false
+            };
+            AssetDatabase.AddObjectToAsset(tree, controller);
+            return tree;
+        }
+
+        private static int ProcessContinuousStateMachine(AnimatorStateMachine machine, string parameter,
+            float defaultValue, AnimatorControllerParameterType friendsParameterType,
+            AnimatorControllerParameterType localParameterType)
+        {
+            var changes = 0;
+            foreach (var childState in machine.states)
+            {
+                var state = childState.state;
+                foreach (var transition in state.transitions.ToArray())
+                    changes += ProcessContinuousTransition(transition, parameter, defaultValue,
+                        () => CloneStateTransition(state, transition), friendsParameterType, localParameterType);
+            }
+
+            foreach (var transition in machine.anyStateTransitions.ToArray())
+                changes += ProcessContinuousTransition(transition, parameter, defaultValue,
+                    () => CloneAnyStateTransition(machine, transition), friendsParameterType, localParameterType);
+
+            foreach (var childMachine in machine.stateMachines)
+                changes += ProcessContinuousStateMachine(childMachine.stateMachine, parameter, defaultValue,
+                    friendsParameterType, localParameterType);
+            return changes;
+        }
+
+        private static int ProcessContinuousTransition(AnimatorStateTransition transition, string parameter,
+            float defaultValue, Func<AnimatorStateTransition> cloneFactory,
+            AnimatorControllerParameterType friendsParameterType, AnimatorControllerParameterType localParameterType)
+        {
+            if (transition.conditions.Any(c => c.parameter == FriendsParameter || c.parameter == LocalParameter))
+                return 0;
+
+            var relevant = transition.conditions.Where(c => c.parameter == parameter).ToArray();
+            if (relevant.Length == 0) return 0;
+
+            var localCopy = cloneFactory();
+            localCopy.conditions = Append(localCopy.conditions,
+                ViewerCondition(LocalParameter, localParameterType, true));
+            transition.conditions = Append(transition.conditions,
+                ViewerCondition(FriendsParameter, friendsParameterType, true));
+
+            if (relevant.All(c => Evaluate(c, defaultValue)))
+            {
+                var strangerCopy = cloneFactory();
+                var conditions = strangerCopy.conditions.Where(c => c.parameter != parameter &&
+                    c.parameter != FriendsParameter && c.parameter != LocalParameter).ToArray();
+                conditions = Append(conditions,
+                    ViewerCondition(FriendsParameter, friendsParameterType, false));
+                strangerCopy.conditions = Append(conditions,
+                    ViewerCondition(LocalParameter, localParameterType, false));
+                strangerCopy.hasExitTime = false;
+                strangerCopy.duration = 0f;
+                strangerCopy.offset = 0f;
+            }
+
+            return 1;
         }
 
         private static int RewriteDirectBlendParameters(AnimatorController controller, string source,

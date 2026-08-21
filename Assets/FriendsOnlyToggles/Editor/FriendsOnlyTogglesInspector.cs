@@ -18,7 +18,7 @@ namespace Strawberry.FriendsOnlyToggles.Editor
             var descriptor = settings.GetComponentInParent<VRCAvatarDescriptor>();
 
             EditorGUILayout.HelpBox(
-                "Checked toggles work normally for you and friends. Strangers are kept in each toggle's inactive state. The Expressions Menu itself is not changed.",
+                "Checked controls work normally for you and friends. Strangers see toggles inactive and continuous controls at their configured default. The Expressions Menu itself is not changed.",
                 MessageType.Info);
 
             if (descriptor == null)
@@ -51,8 +51,11 @@ namespace Strawberry.FriendsOnlyToggles.Editor
 
                 using (new EditorGUI.DisabledScope(!rule.supported))
                 {
+                    var valueDescription = rule.continuous
+                        ? "default " + rule.defaultValue
+                        : rule.parameter + " = " + rule.activeValue;
                     var label = new GUIContent(rule.menuPath,
-                        rule.parameter + " = " + rule.activeValue + " (" + rule.controlType + ")");
+                        rule.parameter + " (" + valueDescription + ", " + rule.controlType + ")");
                     var value = EditorGUILayout.ToggleLeft(label, rule.friendsOnly);
                     if (value != rule.friendsOnly)
                     {
@@ -65,7 +68,7 @@ namespace Strawberry.FriendsOnlyToggles.Editor
                 if (!rule.supported)
                 {
                     EditorGUI.indentLevel++;
-                    EditorGUILayout.LabelField(rule.controlType + " controls are listed for visibility but are not supported in 0.1.", EditorStyles.miniLabel);
+                    EditorGUILayout.LabelField(rule.controlType + " controls are listed for visibility but cannot be protected.", EditorStyles.miniLabel);
                     EditorGUI.indentLevel--;
                 }
             }
