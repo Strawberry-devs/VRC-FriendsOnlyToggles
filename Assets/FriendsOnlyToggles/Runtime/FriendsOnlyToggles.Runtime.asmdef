@@ -1,0 +1,8 @@
+{
+  "name": "FriendsOnlyToggles.Runtime",
+  "rootNamespace": "Strawberry.FriendsOnlyToggles",
+  "references": [
+    "VRC.SDKBase"
+  ],
+  "autoReferenced": true
+}

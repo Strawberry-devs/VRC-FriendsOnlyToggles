@@ -1,0 +1,54 @@
+name: Build and release package
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate sources
+        shell: pwsh
+        run: ./scripts/Test-Package.ps1
+
+      - name: Build unitypackage
+        shell: pwsh
+        run: ./scripts/Build-UnityPackage.ps1
+
+      - name: Build VPM package
+        shell: pwsh
+        run: ./scripts/Build-VpmPackage.ps1
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: FriendsOnlyToggles
+          path: |
+            dist/FriendsOnlyToggles.unitypackage
+            dist/dev.strawberry.friendsonlytoggles-*.zip
+
+      - name: Publish rolling release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "friends-only-toggles-latest"
+          git tag --force $tag $env:GITHUB_SHA
+          git push --force origin "refs/tags/$tag"
+          gh release view $tag 2>$null
+          if($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "VRC Friends-Only Toggles" --notes "Import the unitypackage manually, or install the VPM ZIP/repository through VCC."
+          }
+          gh release upload $tag dist/FriendsOnlyToggles.unitypackage dist/dev.strawberry.friendsonlytoggles-*.zip --clobber
+

@@ -1,0 +1,18 @@
+{
+  "name": "FriendsOnlyToggles.Editor",
+  "rootNamespace": "Strawberry.FriendsOnlyToggles.Editor",
+  "references": [
+    "FriendsOnlyToggles.Runtime",
+    "VRC.SDKBase.Editor.BuildPipeline"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "precompiledReferences": [
+    "VRCSDKBase.dll",
+    "VRCSDKBase-Editor.dll",
+    "VRCSDK3A.dll"
+  ],
+  "overrideReferences": false,
+  "autoReferenced": true
+}

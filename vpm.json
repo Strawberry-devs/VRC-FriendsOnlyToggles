@@ -1,0 +1,33 @@
+{
+  "name": "Strawberry-devs",
+  "id": "dev.strawberry.vpm",
+  "author": "Strawberry-devs",
+  "url": "https://raw.githubusercontent.com/Strawberry-devs/VRC-FriendsOnlyToggles/main/vpm.json",
+  "packages": {
+    "dev.strawberry.friendsonlytoggles": {
+      "versions": {
+        "0.1.0": {
+          "name": "dev.strawberry.friendsonlytoggles",
+          "displayName": "VRC Friends-Only Toggles",
+          "version": "0.1.0",
+          "unity": "2022.3",
+          "description": "Makes selected VRChat avatar toggles visible only to friends while preserving the owner's normal menu and local view.",
+          "author": {
+            "name": "Strawberry-devs",
+            "url": "https://github.com/Strawberry-devs"
+          },
+          "license": "MIT",
+          "url": "https://github.com/Strawberry-devs/VRC-FriendsOnlyToggles/releases/download/friends-only-toggles-latest/dev.strawberry.friendsonlytoggles-0.1.0.zip",
+          "repo": "https://raw.githubusercontent.com/Strawberry-devs/VRC-FriendsOnlyToggles/main/vpm.json",
+          "vpmDependencies": {
+            "com.vrchat.avatars": ">=3.7.0 <4.0.0-a"
+          },
+          "legacyFolders": {
+            "Assets\\FriendsOnlyToggles": "f61d915d879544b1b8933f60671e1834"
+          }
+        }
+      }
+    }
+  }
+}
+

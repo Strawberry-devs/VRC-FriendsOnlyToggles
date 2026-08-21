@@ -1,0 +1,4 @@
+dist/
+.compile-test/
+*.user
+*.suo
